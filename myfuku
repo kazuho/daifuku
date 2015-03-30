@@ -37,9 +37,16 @@ my @triggers = (
     <<'EOT',
 create procedure myfuku_begin()
 begin
-    insert into myfuku_log (action) values ('');
-    set @myfuku_id=@@last_insert_id;
-    select trx_id into @myfuku_trx_id from information_schema.innodb_trx where trx_mysql_thread_id=connection_id();
+  insert into myfuku_log (action) values ('');
+  set @myfuku_id=@@last_insert_id;
+  select trx_id into @myfuku_trx_id from information_schema.innodb_trx where trx_mysql_thread_id=connection_id();
+end
+EOT
+    "drop function if exists myfuku_encode_string",
+    <<'EOT',
+create function myfuku_encode_string(src longtext) returns longtext deterministic
+begin
+  return concat('["',replace(to_base64(src),'\\n',''),'"]');
 end
 EOT
 );
@@ -50,18 +57,23 @@ while (@ARGV) {
     # fetch the list of columns
     my $rows = $dbh->selectall_arrayref('select * from INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA=? and TABLE_NAME=?', { Slice => {} }, $dbname, $tblname)
         or die $dbh->errstr;
-    # create trigger
+    # functions
+    my $encode = sub {
+        my $col = shift;
+        if ($col->{DATA_TYPE} =~ m{(?:integer|int|real)(\s?|$)}) {
+            return qq{concat('"',new.$col->{COLUMN_NAME},'"')};
+        } else {
+            return qq{myfuku_encode_string(new.$col->{COLUMN_NAME})};
+        }
+    };
+    # create insert trigger
     push @triggers, "drop trigger if exists myfuku_${tblname}_after_insert";
     push @triggers, do {
         my $builder = sub {
             my @args;
             for my $col (@$rows) {
                 push @args, qq{',"$col->{COLUMN_NAME}":'};
-                if ($col->{DATA_TYPE} =~ m{(?:integer|int|real)(\s?|$)}) {
-                    push @args, "new.$col->{COLUMN_NAME}";
-                } else {
-                    push @args, qq{concat('"',replace(to_base64(new.$col->{COLUMN_NAME}),'\\n',''),'"')};
-                }
+                push @args, $encode->($col);
             }
             if (@args) {
                 $args[0] =~ s|^',|'["insert","$tblname",{|s;
