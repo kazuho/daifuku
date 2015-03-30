@@ -66,6 +66,7 @@ my $dbh = do {
 };
 
 my @triggers = (
+    "create table if not exists daifuku_log (id bigint unsigned not null primary key auto_increment,info longtext not null,action longtext not null) charset=utf8",
     "drop procedure if exists daifuku_begin",
     <<'EOT',
 create procedure daifuku_begin(info longtext)
