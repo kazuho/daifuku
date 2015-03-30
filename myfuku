@@ -35,9 +35,9 @@ my $dbh = do {
 my @triggers = (
     "drop procedure if exists myfuku_begin",
     <<'EOT',
-create procedure myfuku_begin()
+create procedure myfuku_begin(info longtext)
 begin
-  insert into myfuku_log (action) values ('[]');
+  insert into myfuku_log (info,action) values (info,'[]');
   set @myfuku_id=@@last_insert_id;
   select trx_id into @myfuku_trx_id from information_schema.innodb_trx where trx_mysql_thread_id=connection_id();
 end
