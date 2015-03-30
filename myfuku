@@ -58,42 +58,35 @@ while (@ARGV) {
     my $rows = $dbh->selectall_arrayref('select * from INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA=? and TABLE_NAME=?', { Slice => {} }, $dbname, $tblname)
         or die $dbh->errstr;
     # functions
-    my $encode = sub {
-        my $col = shift;
-        if ($col->{DATA_TYPE} =~ m{(?:integer|int|real)(\s?|$)}) {
-            return qq{concat('"',new.$col->{COLUMN_NAME},'"')};
-        } else {
-            return qq{myfuku_encode_string(new.$col->{COLUMN_NAME})};
+    my $build_row_args = sub {
+        my $prefix = shift;
+        my @args;
+        for my $col (@$rows) {
+            push @args, qq{',"$col->{COLUMN_NAME}":'};
+            if ($col->{DATA_TYPE} =~ m{(?:integer|int|real)(\s?|$)}) {
+                push @args, qq{concat('"',$prefix.$col->{COLUMN_NAME},'"')};
+            } else {
+                push @args, qq{myfuku_encode_string($prefix.$col->{COLUMN_NAME})};
+            }
         }
+        return +(qq{'{}'})
+            unless @args;
+        $args[0] =~ s|^',|'{|s;
+        push @args, q|'}'|;
+        @args;
     };
     # create insert trigger
     push @triggers, "drop trigger if exists myfuku_${tblname}_after_insert";
-    push @triggers, do {
-        my $builder = sub {
-            my @args;
-            for my $col (@$rows) {
-                push @args, qq{',"$col->{COLUMN_NAME}":'};
-                push @args, $encode->($col);
-            }
-            if (@args) {
-                $args[0] =~ s|^',|'["insert","$tblname",{|s;
-                push @args, q|'}]'|;
-                return "concat(" . join(",", @args) . ")";
-            } else {
-                return qq{'["insert","$tblname",{}]'};
-            }
-        };
-        <<"EOT";
+    push @triggers, <<"EOT";
 create trigger myfuku_${tblname}_after_insert after insert on $tblname
 for each row begin
   declare v longtext;
   if \@myfuku_trx_id is not null and (select count(*) from information_schema.innodb_trx where trx_id=\@myfuku_trx_id and trx_mysql_thread_id=connection_id()) = 1 then
-    set v = @{[$builder->()]};
+    set v = concat('["insert","$tblname",',@{[join ',', $build_row_args->('new')]},']');
     update myfuku_log set action=concat(action,',',v) where id=\@myfuku_id;
   end if;
 end
 EOT
-    };
 }
 
 chomp $_ for @triggers;
