@@ -22,6 +22,12 @@ COMMAND OPTIONS
   --socket=socket-file
     override the default server location specified in "my.cnf"
 
+  --user=username
+    username to be used for connecting to the database (default: `root`)
+
+  --pass=password
+    password to be used for connecting to the database (default: none)
+
   --help
     prints help
 
