@@ -57,6 +57,72 @@ STORED PROCEDURES
     Returns 1 if daifuku_begin() has been called for the current
     transaction, or 0 if otherwise.
 
+LOG FORMAT
+    The transaction log is stored in `daifuku_log` table which is
+    automatically created when installing the triggers. The schema of the
+    table looks like:
+
+        CREATE TABLE `daifuku_log` (
+          `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+          `info` longtext NOT NULL,
+          `action` longtext NOT NULL,
+          PRIMARY KEY (`id`)
+        ) DEFAULT CHARSET=utf8
+
+    Within the `action` column, log of each transaction is stored as an JSON
+    array of an array consisting of four-elements.
+
+    operation
+        the first element stores the type of the operation. It is one of:
+        "insert", "update", "delete"
+
+    table_name
+        the second element stores the name of the modified table
+
+    old_columns
+        For "update" and "delete" operations, the third element stores a
+        JSON object listing the values of the columns before the operation
+        was performed. For "insert" operations, the element is "null".
+
+    new_columns
+        For "insert" and "update" operations, the fourth element stores a
+        JSON object listing the values of the columns after the operation
+        was performed. For "delete" operations, the element is "null".
+
+    In the value-parts of the third and fourth elements, column data are
+    stored either as JSON strings or as base64-encoded strings encapsulated
+    in single-element JSON arrays.
+
+    For example, the transaction log shown below indicates that a message
+    (body is `hello`) is sent from user 33 to user 89, and that the the
+    entry in `last_action` table for user 33 has been updated to reflect the
+    time of the action.
+
+        [
+            [
+                "insert",
+                "messages",
+                {},
+                {
+                    "id":"199",
+                    "from":"33","to":"89",
+                    "body":["aGVsbG8="]
+                }
+            ],
+            [
+                "update",
+                "last_action",
+                {
+                    "user_id":"33",
+                    "at":"2015-03-29 12:35:56"
+                },
+                {
+                    "user_id":"33",
+                    "at":"2015-03-31 01:23:45"
+                }
+            ]
+        ]
+
 AUTHOR
     Kazuho Oku
 
