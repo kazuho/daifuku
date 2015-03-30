@@ -37,9 +37,16 @@ my @triggers = (
     <<'EOT',
 create procedure myfuku_begin()
 begin
-  insert into myfuku_log (action) values ('');
+  insert into myfuku_log (action) values ('[]');
   set @myfuku_id=@@last_insert_id;
   select trx_id into @myfuku_trx_id from information_schema.innodb_trx where trx_mysql_thread_id=connection_id();
+end
+EOT
+    "drop procedure if exists myfuku_append_action",
+    <<'EOT',
+create procedure myfuku_append_action(v longtext)
+begin
+  update myfuku_log set action=if(char_length(action)<=2,concat('[',v,']'),concat(substring(action,1,char_length(action)-1),',',v,']')) where id=@myfuku_id;
 end
 EOT
     "drop function if exists myfuku_encode_string",
@@ -82,7 +89,7 @@ while (@ARGV) {
 create trigger myfuku_${tblname}_after_insert after insert on $tblname
 for each row begin
   if $checkexpr then
-    update myfuku_log set action=concat(action,',',concat('["insert","$tblname",',@{[join ',', $build_row_args->('new')]},']')) where id=\@myfuku_id;
+    call myfuku_append_action(concat('["insert","$tblname",',@{[join ',', $build_row_args->('new')]},']'));
   end if;
 end
 EOT
@@ -92,7 +99,7 @@ EOT
 create trigger myfuku_${tblname}_after_update after update on $tblname
 for each row begin
   if $checkexpr then
-    update myfuku_log set action=concat(action,',',concat('["update","$tblname",',@{[join ',', $build_row_args->('new')]},',',@{[join ',', $build_row_args->('old')]},']')) where id=\@myfuku_id;
+    call myfuku_append_action(concat('["update","$tblname",',@{[join ',', $build_row_args->('new')]},',',@{[join ',', $build_row_args->('old')]},']'));
   end if;
 end
 EOT
@@ -102,7 +109,7 @@ EOT
 create trigger myfuku_${tblname}_after_delete after delete on $tblname
 for each row begin
   if $checkexpr then
-    update myfuku_log set action=concat(action,',',concat('["delete","$tblname",',@{[join ',', $build_row_args->('old')]},']')) where id=\@myfuku_id;
+    call myfuku_append_action(concat('["delete","$tblname",',@{[join ',', $build_row_args->('old')]},']'));
   end if;
 end
 EOT
