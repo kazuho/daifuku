@@ -163,11 +163,20 @@ daifuku - transaction logging in JSON, within the MySQL database
 
 =head1 SYNOPSIS
 
-  # print stored procedures / triggers for the tables
-  daifuku dbname tblname1 tblname2 ...
+    # print stored procedures / triggers for the tables
+    daifuku dbname tblname1 tblname2 ... > setup.sql
 
-  # install the procedures and triggers
-  daifuku dbname tblname1 tblname2 ... | mysql -u root dbname
+    # install the procedures and triggers
+    mysql -u root dbname < setup.sql
+
+    # to record the log, issue the following sequence of SQL
+    BEGIN;                          -- start a transaction
+    CALL daifuku_begin('any text'); -- activate logging of the transaction
+    ...                             -- issue statements
+    COMMIT;                         -- commit the transaction
+
+    # log is stored in the `myfuku_log` table
+    SELECT * FROM myfuku_log;
 
 =head1 DESCRIPTION
 
