@@ -33,25 +33,25 @@ my $dbh = do {
 };
 
 my @triggers = (
-    "drop procedure if exists myfuku_begin",
+    "drop procedure if exists daifuku_begin",
     <<'EOT',
-create procedure myfuku_begin(info longtext)
+create procedure daifuku_begin(info longtext)
 begin
-  insert into myfuku_log (info,action) values (info,'[]');
-  set @myfuku_id=@@last_insert_id;
-  select trx_id into @myfuku_trx_id from information_schema.innodb_trx where trx_mysql_thread_id=connection_id();
+  insert into daifuku_log (info,action) values (info,'[]');
+  set @daifuku_id=@@last_insert_id;
+  select trx_id into @daifuku_trx_id from information_schema.innodb_trx where trx_mysql_thread_id=connection_id();
 end
 EOT
-    "drop procedure if exists myfuku_append_action",
+    "drop procedure if exists daifuku_append_action",
     <<'EOT',
-create procedure myfuku_append_action(v longtext)
+create procedure daifuku_append_action(v longtext)
 begin
-  update myfuku_log set action=if(char_length(action)<=2,concat('[',v,']'),concat(substring(action,1,char_length(action)-1),',',v,']')) where id=@myfuku_id;
+  update daifuku_log set action=if(char_length(action)<=2,concat('[',v,']'),concat(substring(action,1,char_length(action)-1),',',v,']')) where id=@daifuku_id;
 end
 EOT
-    "drop function if exists myfuku_encode_string",
+    "drop function if exists daifuku_encode_string",
     <<'EOT',
-create function myfuku_encode_string(src longtext) returns longtext deterministic
+create function daifuku_encode_string(src longtext) returns longtext deterministic
 begin
   return concat('["',replace(to_base64(src),'\\n',''),'"]');
 end
@@ -65,7 +65,7 @@ while (@ARGV) {
     my $rows = $dbh->selectall_arrayref('select * from INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA=? and TABLE_NAME=?', { Slice => {} }, $dbname, $tblname)
         or die $dbh->errstr;
     # functions
-    my $checkexpr = q{@myfuku_trx_id is not null and (select count(*) from information_schema.innodb_trx where trx_id=@myfuku_trx_id and trx_mysql_thread_id=connection_id()) = 1};
+    my $checkexpr = q{@daifuku_trx_id is not null and (select count(*) from information_schema.innodb_trx where trx_id=@daifuku_trx_id and trx_mysql_thread_id=connection_id()) = 1};
     my $build_row_args = sub {
         my $prefix = shift;
         my @args;
@@ -74,7 +74,7 @@ while (@ARGV) {
             if ($col->{DATA_TYPE} =~ m{(?:integer|int|real)(\s?|$)}) {
                 push @args, qq{concat('"',$prefix.$col->{COLUMN_NAME},'"')};
             } else {
-                push @args, qq{myfuku_encode_string($prefix.$col->{COLUMN_NAME})};
+                push @args, qq{daifuku_encode_string($prefix.$col->{COLUMN_NAME})};
             }
         }
         return +(qq{'{}'})
@@ -84,32 +84,32 @@ while (@ARGV) {
         @args;
     };
     # create insert trigger
-    push @triggers, "drop trigger if exists myfuku_${tblname}_after_insert";
+    push @triggers, "drop trigger if exists daifuku_${tblname}_after_insert";
     push @triggers, <<"EOT";
-create trigger myfuku_${tblname}_after_insert after insert on $tblname
+create trigger daifuku_${tblname}_after_insert after insert on $tblname
 for each row begin
   if $checkexpr then
-    call myfuku_append_action(concat('["insert","$tblname",',@{[join ',', $build_row_args->('new')]},']'));
+    call daifuku_append_action(concat('["insert","$tblname",',@{[join ',', $build_row_args->('new')]},']'));
   end if;
 end
 EOT
     # create update trigger
-    push @triggers, "drop trigger if exists myfuku_${tblname}_after_update";
+    push @triggers, "drop trigger if exists daifuku_${tblname}_after_update";
     push @triggers, <<"EOT";
-create trigger myfuku_${tblname}_after_update after update on $tblname
+create trigger daifuku_${tblname}_after_update after update on $tblname
 for each row begin
   if $checkexpr then
-    call myfuku_append_action(concat('["update","$tblname",',@{[join ',', $build_row_args->('new')]},',',@{[join ',', $build_row_args->('old')]},']'));
+    call daifuku_append_action(concat('["update","$tblname",',@{[join ',', $build_row_args->('new')]},',',@{[join ',', $build_row_args->('old')]},']'));
   end if;
 end
 EOT
     # create delete trigger
-    push @triggers, "drop trigger if exists myfuku_${tblname}_after_delete";
+    push @triggers, "drop trigger if exists daifuku_${tblname}_after_delete";
     push @triggers, <<"EOT";
-create trigger myfuku_${tblname}_after_delete after delete on $tblname
+create trigger daifuku_${tblname}_after_delete after delete on $tblname
 for each row begin
   if $checkexpr then
-    call myfuku_append_action(concat('["delete","$tblname",',@{[join ',', $build_row_args->('old')]},']'));
+    call daifuku_append_action(concat('["delete","$tblname",',@{[join ',', $build_row_args->('old')]},']'));
   end if;
 end
 EOT
