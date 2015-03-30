@@ -14,8 +14,8 @@ SYNOPSIS
         ...                             -- issue statements
         COMMIT;                         -- commit the transaction
 
-        # log is stored in the `myfuku_log` table
-        SELECT * FROM myfuku_log;
+        # log is stored in the `daifuku_log` table
+        SELECT * FROM daifuku_log;
 
 DESCRIPTION
     Daifuku generates stored procedures / triggers for logging the changes
