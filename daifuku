@@ -193,7 +193,7 @@ prints the version number
 
 =head2 daifuku_begin(info)
 
-The function instructs the triggers to log the current transaction.  Upon return, the id of the row within the L<daifuku_log> table in which the transaction will be logged is stored in the C<@daifuku_id> user variable.
+The function instructs the triggers to log the current transaction.  Upon return, the id of the row within the L<daifuku_log> table in which the transaction will be logged is stored in the C<@daifuku_id> user variable.  Arbitrary text can be passed as an argument, which would be stored in the `info` column of the L<daifuku_log> table.
 
 The function cannot be used outside of a transaction.
 
