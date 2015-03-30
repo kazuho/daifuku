@@ -1,9 +1,32 @@
 #! /usr/bin/perl
+#
+# Copyright (c) 2015 Kazuho Oku
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+# IN THE SOFTWARE.
 
 use strict;
 use warnings;
 use DBI;
 use Getopt::Long;
+use Pod::Usage;
+
+our $VERSION = '0.1.0';
 
 my ($mysql_host, $mysql_port, $mysql_socket);
 
@@ -11,6 +34,13 @@ GetOptions(
     "host=s"   => \$mysql_host,
     "port=i"   => \$mysql_port,
     "socket=s" => \$mysql_socket,
+    "help"     => sub {
+        pod2usage(-exitval => 0, -verbose => 1);
+    },
+    "version"  => sub {
+        print "daifuku version $VERSION\n";
+        exit 0;
+    },
 ) or exit(1);
 
 if (@ARGV < 1) {
@@ -120,3 +150,59 @@ chomp $_ for @triggers;
 print "delimiter |\n";
 print "$_|\n" for @triggers;
 print "delimiter ;\n";
+
+__END__
+
+=head1 NAME
+
+daifuku - transaction logging in JSON, within the MySQL database
+
+=head1 SYNOPSIS
+
+  # print stored procedures / triggers for the tables
+  daifuku dbname tblname1 tblname2 ...
+
+  # install the procedures and triggers
+  daifuku dbname tblname1 tblname2 ... | mysql -u root dbname
+
+=head1 DESCRIPTION
+
+Daifuku generates stored procedures / triggers for logging the changes made through the transactions.
+
+The log is collected in the L<daifuku_log> table in JSON format, so that it would be easy to use the log for whatever purpose (e.g. for audit, undo, display, etc.).
+
+=head1 COMMAND OPTIONS
+
+=head2 --host=host
+
+=head2 --port=port
+
+=head2 --socket=socket-file
+
+override the default server location specified in C<my.cnf>
+
+=head2 --help
+
+prints help
+
+=head2 --version
+
+prints the version number
+
+=head1 STORED PROCEDURES
+
+=head2 daifuku_begin(info)
+
+The function instructs the triggers to log the current transaction.  Upon return, the id of the row within the L<daifuku_log> table in which the transaction will be logged is stored in the C<@daifuku_id> user variable.
+
+The function cannot be used outside of a transaction.
+
+=head1 AUTHOR
+
+Kazuho Oku
+
+=head1 LICENSE
+
+The software is licensed under the MIT license.
+
+=cut
