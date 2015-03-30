@@ -58,6 +58,8 @@ while (@ARGV) {
     my $rows = $dbh->selectall_arrayref('select * from INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA=? and TABLE_NAME=?', { Slice => {} }, $dbname, $tblname)
         or die $dbh->errstr;
     # functions
+    my $checkexpr = q{@myfuku_trx_id is not null and (select count(*) from information_schema.innodb_trx where trx_id=@myfuku_trx_id and trx_mysql_thread_id=connection_id()) = 1};
+    chop $checkexpr;
     my $build_row_args = sub {
         my $prefix = shift;
         my @args;
@@ -81,9 +83,19 @@ while (@ARGV) {
 create trigger myfuku_${tblname}_after_insert after insert on $tblname
 for each row begin
   declare v longtext;
-  if \@myfuku_trx_id is not null and (select count(*) from information_schema.innodb_trx where trx_id=\@myfuku_trx_id and trx_mysql_thread_id=connection_id()) = 1 then
-    set v = concat('["insert","$tblname",',@{[join ',', $build_row_args->('new')]},']');
-    update myfuku_log set action=concat(action,',',v) where id=\@myfuku_id;
+  if $checkexpr then
+    update myfuku_log set action=concat(action,',',concat('["insert","$tblname",',@{[join ',', $build_row_args->('new')]},']')) where id=\@myfuku_id;
+  end if;
+end
+EOT
+    # create update trigger
+    push @triggers, "drop trigger if exists myfuku_${tblname}_after_update";
+    push @triggers, <<"EOT";
+create trigger myfuku_${tblname}_after_update after update on $tblname
+for each row begin
+  declare v longtext;
+  if $checkexpr then
+    update myfuku_log set action=concat(action,',',concat('["update","$tblname",',@{[join ',', $build_row_args->('new')]},',',@{[join ',', $build_row_args->('old')]},']')) where id=\@myfuku_id;
   end if;
 end
 EOT
