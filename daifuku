@@ -194,6 +194,14 @@ Daifuku generates stored procedures / triggers for logging the changes made thro
 
 The log is collected in the L<daifuku_log> table in JSON format, so that it would be easy to use the log for whatever purpose (e.g. for audit, undo, display, etc.).
 
+=head1 INSTALLATION
+
+The software is packaged as an ordinary Perl module.  It can be installed by running the following commands.
+
+    % perl Makefile.PL
+    % make
+    % make install
+
 =head1 COMMAND OPTIONS
 
 =head2 --host=host

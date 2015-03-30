@@ -25,6 +25,14 @@ DESCRIPTION
     would be easy to use the log for whatever purpose (e.g. for audit, undo,
     display, etc.).
 
+INSTALLATION
+    The software is packaged as an ordinary Perl module. It can be installed
+    by running the following commands.
+
+        % perl Makefile.PL
+        % make
+        % make install
+
 COMMAND OPTIONS
   --host=host
   --port=port
