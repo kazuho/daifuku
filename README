@@ -53,6 +53,10 @@ STORED PROCEDURES
 
     The function cannot be used outside of a transaction.
 
+  daifuku_is_active()
+    Returns 1 if daifuku_begin() has been called for the current
+    transaction, or 0 if otherwise.
+
 AUTHOR
     Kazuho Oku
 

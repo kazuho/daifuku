@@ -76,6 +76,16 @@ begin
   select trx_id into @daifuku_trx_id from information_schema.innodb_trx where trx_mysql_thread_id=connection_id();
 end
 EOT
+    "drop function if exists daifuku_is_active",
+    <<'EOT',
+create function daifuku_is_active() returns int
+begin
+  if @daifuku_trx_id is null then
+    return 0;
+  end if;
+  return (select count(*) from information_schema.innodb_trx where trx_id=@daifuku_trx_id and trx_mysql_thread_id=connection_id());
+end
+EOT
     "drop procedure if exists daifuku_append_action",
     <<'EOT',
 create procedure daifuku_append_action(v longtext)
@@ -99,7 +109,7 @@ while (@ARGV) {
     my $rows = $dbh->selectall_arrayref('select * from INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA=? and TABLE_NAME=?', { Slice => {} }, $dbname, $tblname)
         or die $dbh->errstr;
     # functions
-    my $checkexpr = q{@daifuku_trx_id is not null and (select count(*) from information_schema.innodb_trx where trx_id=@daifuku_trx_id and trx_mysql_thread_id=connection_id()) = 1};
+    my $checkexpr = q{daifuku_is_active()};
     my $build_row_args = sub {
         my $prefix = shift;
         my @args;
@@ -123,7 +133,7 @@ while (@ARGV) {
 create trigger daifuku_${tblname}_after_insert after insert on $tblname
 for each row begin
   if $checkexpr then
-    call daifuku_append_action(concat('["insert","$tblname",',@{[join ',', $build_row_args->('new')]},']'));
+    call daifuku_append_action(concat('["insert","$tblname",{},',@{[join ',', $build_row_args->('new')]},']'));
   end if;
 end
 EOT
@@ -133,7 +143,7 @@ EOT
 create trigger daifuku_${tblname}_after_update after update on $tblname
 for each row begin
   if $checkexpr then
-    call daifuku_append_action(concat('["update","$tblname",',@{[join ',', $build_row_args->('new')]},',',@{[join ',', $build_row_args->('old')]},']'));
+    call daifuku_append_action(concat('["update","$tblname",',@{[join ',', $build_row_args->('old')]},',',@{[join ',', $build_row_args->('new')]},']'));
   end if;
 end
 EOT
@@ -143,7 +153,7 @@ EOT
 create trigger daifuku_${tblname}_after_delete after delete on $tblname
 for each row begin
   if $checkexpr then
-    call daifuku_append_action(concat('["delete","$tblname",',@{[join ',', $build_row_args->('old')]},']'));
+    call daifuku_append_action(concat('["delete","$tblname",',@{[join ',', $build_row_args->('old')]},',{}]'));
   end if;
 end
 EOT
@@ -217,6 +227,10 @@ prints the version number
 The function instructs the triggers to log the current transaction.  Upon return, the id of the row within the L<daifuku_log> table in which the transaction will be logged is stored in the C<@daifuku_id> user variable.  Arbitrary text can be passed as an argument, which would be stored in the `info` column of the L<daifuku_log> table.
 
 The function cannot be used outside of a transaction.
+
+=head2 daifuku_is_active()
+
+Returns 1 if L<daifuku_begin()> has been called for the current transaction, or 0 if otherwise.
 
 =head1 AUTHOR
 
