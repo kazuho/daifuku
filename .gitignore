@@ -1,0 +1,7 @@
+*.swp
+.DS_Store
+inc/
+Makefile
+META.*
+MYMETA.*
+tmp/

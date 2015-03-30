@@ -1,0 +1,44 @@
+NAME
+    daifuku - transaction logging in JSON, within the MySQL database
+
+SYNOPSIS
+      # print stored procedures / triggers for the tables
+      daifuku dbname tblname1 tblname2 ...
+
+      # install the procedures and triggers
+      daifuku dbname tblname1 tblname2 ... | mysql -u root dbname
+
+DESCRIPTION
+    Daifuku generates stored procedures / triggers for logging the changes
+    made through the transactions.
+
+    The log is collected in the daifuku_log table in JSON format, so that it
+    would be easy to use the log for whatever purpose (e.g. for audit, undo,
+    display, etc.).
+
+COMMAND OPTIONS
+  --host=host
+  --port=port
+  --socket=socket-file
+    override the default server location specified in "my.cnf"
+
+  --help
+    prints help
+
+  --version
+    prints the version number
+
+STORED PROCEDURES
+  daifuku_begin(info)
+    The function instructs the triggers to log the current transaction. Upon
+    return, the id of the row within the daifuku_log table in which the
+    transaction will be logged is stored in the @daifuku_id user variable.
+
+    The function cannot be used outside of a transaction.
+
+AUTHOR
+    Kazuho Oku
+
+LICENSE
+    The software is licensed under the MIT license.
+
